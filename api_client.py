@@ -1,63 +1,60 @@
 import requests
-import os
-from dotenv import load_dotenv
 
-load_dotenv()
+from config.settings import NOMINATIM_URL, HEADERS
 
-API_EMAIL = os.getenv("API_EMAIL")
+OPENSKY_STATES_URL = "https://opensky-network.org/api/states/all"
 
 
-def get_country_coordinates(country_name):
+def get_country_coordinates(country_name: str):
     """
-    Получает координаты страны через Nominatim.
-    ИСПРАВЛЕНО: в заголовках нет заглушки (your_email@example.com).
+    Получает координаты страны через Nominatim API.
+    Возвращает словарь {"lat": float, "lon": float} или None.
     """
-    url = "https://nominatim.openstreetmap.org/search"
-
-    # ВАЖНО: используем реальный email из .env
-    headers = {
-        "User-Agent": f"AirProject/1.0 ({API_EMAIL})"
-    }
-
-    params = {
-        "q": country_name,
-        "format": "json",
-        "limit": 1
-    }
-
-    response = requests.get(url, headers=headers, params=params)
-    response.raise_for_status()
-    data = response.json()
-
-    if data:
-        return data[0]["lat"], data[0]["lon"]
-    return None, None
+    params = {"country": country_name, "format": "json", "limit": 1}
+    try:
+        response = requests.get(
+            NOMINATIM_URL, headers=HEADERS, params=params, timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+        if not data:
+            return None
+        return {"lat": float(data[0]["lat"]), "lon": float(data[0]["lon"])}
+    except Exception as e:
+        print(f"⚠️ Ошибка получения координат для {country_name}: {e}")
+        return None
 
 
 def get_aircrafts_data():
     """
-    Получает данные о самолетах через OpenSky Network API.
-    Возвращает список словарей.
+    Получает данные о воздушных судах через OpenSky Network API.
+    Возвращает список словарей с распарсенными полями.
     """
-    url = "https://opensky-network.org/api/states/all"
-    response = requests.get(url)
-    response.raise_for_status()
-    states = response.json()["states"]
+    try:
+        response = requests.get(OPENSKY_STATES_URL, timeout=15)
+        response.raise_for_status()
+        states = response.json().get("states", [])
 
-    aircrafts = []
-    for state in states:
-        # state: [icao24, callsign, origin_country, time_position, lon, lat, baro_altitude, ...]
-        aircrafts.append({
-            "icao24": state[0],
-            "callsign": state[1],
-            "origin_country": state[2],
-            "time_position": state[3],  # int (Unix timestamp) — подходит для BIGINT
-            "longitude": state[4],
-            "latitude": state[5],
-            "baro_altitude": state[6],
-            "velocity": state[9],  # velocity
-            "heading": state[10],
-            "vertical_rate": state[11],
-            "last_contact": state[8]  # last_contact
-        })
-    return aircrafts
+        aircrafts = []
+        for state in states:
+            try:
+                aircrafts.append({
+                    "icao24": state[0],
+                    "callsign": state[1],
+                    "origin_country": state[2],
+                    "time_position": state[3],
+                    "longitude": state[5],
+                    "latitude": state[6],
+                    "baro_altitude": state[7],
+                    "velocity": state[9],
+                    "heading": state[10],
+                    "vertical_rate": state[11],
+                    "last_contact": state[4],
+                    "on_ground": state[8] == 1,
+                })
+            except IndexError:
+                continue
+        return aircrafts
+    except Exception as e:
+        print(f"⚠️ Ошибка получения данных о самолётах: {e}")
+        return []
