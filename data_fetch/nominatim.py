@@ -1,6 +1,6 @@
 import requests
 from typing import List, Dict, Optional
-from config.settings import NOMINATIM_USER_AGENT, COUNTRIES
+from config.settings import HEADERS, COUNTRIES
 
 def get_country_location(country_name: str) -> Optional[Dict]:
     url = "https://nominatim.openstreetmap.org/search"
@@ -10,7 +10,7 @@ def get_country_location(country_name: str) -> Optional[Dict]:
         "limit": 1,
         "addressdetails": 1,
     }
-    headers = {"User-Agent": NOMINATIM_USER_AGENT}
+    headers = HEADERS
     resp = requests.get(url, params=params, headers=headers, timeout=10)
     resp.raise_for_status()
     data = resp.json()
