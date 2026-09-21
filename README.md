@@ -50,4 +50,3 @@ NOMINATIM_EMAIL=your_email@example.com
 - HTTP-запросы: `requests`
 - Формат данных: JSON
 
-## Структура проекта
